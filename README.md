@@ -73,16 +73,86 @@ private networking namespace of a vdestack.
 For example, an interface with a static ip address and a static default route can be defined as follows:
 ```
 vde_stackcmd(stack,
-		"/bin/busybox ip link set vde0 up;"
-		"/bin/busybox ip addr add 10.0.0.2/24 dev vde0;"
-		"/bin/busybox ip route add default via 10.0.0.254");
+        "/bin/busybox ip link set vde0 up;"
+        "/bin/busybox ip addr add 10.0.0.2/24 dev vde0;"
+        "/bin/busybox ip route add default via 10.0.0.254");
 ```
 
 It is also possible to run a dhcp client to configure a vdestack interface:
 ```
 vde_stackcmd(stack,
-		"/bin/busybox ip link set vde0 up;"
-		"/bin/busybox udhcpc -q -s /home/user/bin/dhcpscript -i vde0");
+        "/bin/busybox ip link set vde0 up;"
+        "/bin/busybox udhcpc -q -s /home/user/bin/dhcpscript -i vde0");
 ```
 
+## A complete example:
 
+The following source file implements a multiclient tcp echo server (using fork) running on a vdestack.
+```
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <netinet/in.h>
+#include <vdestack.h>
+
+struct vdestack *mystack;
+
+static void getstatus(int signo) {
+    int status;
+    wait(&status);
+}
+
+int main(int arg, char *argv[]) {
+    struct sockaddr_in servaddr, cliaddr;
+    int fd, connfd;
+    char buf[BUFSIZ];
+    mystack = vde_addstack("vde://", NULL);
+    vde_stackcmd(mystack,"/bin/busybox ip addr add 192.168.250.100/24 dev vde0;"
+            "/bin/busybox ip link set vde0 up;"
+            "/bin/busybox ip route add default via 192.168.250.1");
+    signal(SIGCHLD, getstatus);
+
+    fd = vde_msocket(mystack, AF_INET, SOCK_STREAM, 0);
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(5000);
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+        exit(1);
+
+    listen (fd, 5);
+
+    for ( ; ; ) {
+        int n;
+        socklen_t clilen = sizeof(cliaddr);
+        connfd = accept (fd, (struct sockaddr *) &cliaddr, &clilen);
+
+        switch (fork()) {
+            case 0:
+                close(fd);
+                printf("new conn %d pid %d\n", connfd, getpid());
+                while ( (n = recv(connfd, buf, BUFSIZ, 0)) > 0)  {
+                    printf("pid %d GOT: %*.*s",getpid(),n,n,buf);
+                    send(connfd, buf, n, 0);
+                }
+                printf("close conn %d pid %d\n", connfd, getpid());
+                close(connfd);
+                exit(0);
+            default:
+                close(connfd);
+                break;
+            case -1:
+                exit(1);
+        }
+    }
+    close(fd);
+    vde_delstack(mystack);
+}
+```
