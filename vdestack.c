@@ -51,6 +51,8 @@
 
 #define errExit(msg)    ({ perror(msg); exit(EXIT_FAILURE); })
 
+#define CHILD_STACK_SIZE (256 * 1024)
+
 struct vdestack {
 	pid_t pid;
 	int cmdpipe[2]; // socketpair for commands;
@@ -61,6 +63,7 @@ struct vdestack {
 		VDECONN *vdeconn;
 		int streamfd[2];
 	} conn;
+	char *child_stack;
 	char ifname[0];
 };
 
@@ -293,9 +296,6 @@ static int childFunc(void *arg)
 	exit(EXIT_SUCCESS);
 }
 
-#define STACK_SIZE (1024 * 1024)
-static char child_stack[STACK_SIZE];    /* Space for child's stack */
-
 /********************************* APP CODE *******************************/
 struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 	char *ifnameok = ifname ? ifname : DEFAULT_IF_NAME;
@@ -303,6 +303,10 @@ struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 	struct vdestack *stack = malloc(sizeof(*stack) + ifnameoklen + 1);
 
 	if (stack) {
+		stack->child_stack = malloc(CHILD_STACK_SIZE);
+		if (stack->child_stack == NULL)
+			goto err_child_stack;
+
 		if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, stack->cmdpipe) < 0)
 			goto err_cmdpipe;
 		stack->cmdpid = -1;
@@ -323,7 +327,7 @@ struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 
 		/* start the networking deamon in a private net namespace, while
 			 sharing memory and file descriptors */
-		stack->pid = clone(childFunc, child_stack + STACK_SIZE,
+		stack->pid = clone(childFunc, stack->child_stack + CHILD_STACK_SIZE,
 				CLONE_VM | CLONE_FILES | CLONE_NEWUSER | CLONE_NEWNET | SIGCHLD, stack);
 		if (stack->pid == -1)
 			goto err_child;
@@ -335,6 +339,8 @@ err_vdenet:
 	close(stack->cmdpipe[APPSIDE]);
 	close(stack->cmdpipe[DAEMONSIDE]);
 err_cmdpipe:
+	free(stack->child_stack);
+err_child_stack:
 	free(stack);
 	return NULL;
 }
@@ -342,6 +348,7 @@ err_cmdpipe:
 void vde_delstack(struct vdestack *stack) {
 	close(stack->cmdpipe[APPSIDE]);
 	waitpid(stack->pid, NULL, 0);
+	free(stack->child_stack);
 	free(stack);
 }
 
