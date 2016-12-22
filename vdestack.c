@@ -272,7 +272,7 @@ static int childFunc(void *arg)
 	stack->sfd = signalfd(-1, &chldmask, SFD_CLOEXEC);
 	prctl(PR_SET_PDEATHSIG, SIGHUP, 0, 0, 0);
 
-	printf("starting stack tid %d\n", stack->pid);
+	/* printf("starting stack tid %d\n", stack->pid); */
 
 	switch (stack->conntype) {
 		case CONNTYPE_NONE:
