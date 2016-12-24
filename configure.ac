@@ -3,6 +3,7 @@ AC_INIT([libvdestack], [0.1], [info@v2.cs.unibo.it])
 AM_INIT_AUTOMAKE([foreign dist-bzip2])
 AC_CONFIG_SRCDIR([vdestack.c])
 AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_MACRO_DIR([m4])
 
 # Checks for programs.
 AC_PROG_LIBTOOL

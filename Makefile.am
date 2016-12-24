@@ -1,6 +1,7 @@
 lib_LTLIBRARIES = libvdestack.la
 man_MANS = libvdestack.3
 include_HEADERS = vdestack.h
+ACLOCAL_AMFLAGS = -I m4
 
 AM_CFLAGS = -Wall -O2 -I.
 
