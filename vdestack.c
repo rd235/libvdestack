@@ -332,7 +332,7 @@ struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 				goto err_vdenet;
 		} else {
 			stack->conntype = CONNTYPE_VDE;
-			if ((stack->conn.vdeconn = vde_open(vdenet, "vdens", NULL)) == NULL)
+			if ((stack->conn.vdeconn = vde_open(vdenet, "vdestack", NULL)) == NULL)
 				goto err_vdenet;
 		}
 
