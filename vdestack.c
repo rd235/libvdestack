@@ -39,6 +39,8 @@
 #include <poll.h>
 #include <sys/signalfd.h>
 #include <execs.h>
+#include <dlfcn.h>
+#include <vdestack.h>
 
 /* just in case prctl.h is not providing these definitions */
 #ifndef PR_CAP_AMBIENT
@@ -89,6 +91,22 @@ struct vdereply {
 	int rval;
 	int err;
 };
+
+
+static struct vdestack *default_stack;
+static int real_socket(int domain, int type, int protocol) {
+	static int (*socket_next) ();
+	if (socket_next == NULL)
+		socket_next = dlsym(RTLD_NEXT, "socket");
+	return socket_next(domain, type, protocol);
+}
+
+int socket(int domain, int type, int protocol) {
+	if (default_stack == NULL)
+		return real_socket(domain, type, protocol);
+	else
+		return vde_msocket(default_stack, domain, type, protocol);
+}
 
 /********************************* DAEMON CODE *******************************/
 
@@ -161,7 +179,7 @@ static int runcmd (struct vdestack *stack) {
 		if (n == sizeof(cmd)) {
 			if (cmd.argv == NULL) {
 				struct vdereply reply;
-				reply.rval = socket(cmd.domain, cmd.type, cmd.protocol);
+				reply.rval = real_socket(cmd.domain, cmd.type, cmd.protocol);
 				reply.err = errno;
 				write(stack->cmdpipe[DAEMONSIDE], &reply, sizeof(reply));
 			} else {
@@ -356,7 +374,13 @@ err_child_stack:
 	return NULL;
 }
 
+void vde_default_stack(struct vdestack *stack) {
+	default_stack = stack;
+}
+
 void vde_delstack(struct vdestack *stack) {
+	if (stack == default_stack)
+		default_stack = NULL;
 	close(stack->cmdpipe[APPSIDE]);
 	waitpid(stack->pid, NULL, 0);
 	free(stack->child_stack);

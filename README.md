@@ -56,6 +56,32 @@ vde_delstack(stack);
 ```
 closes a stack.
 
+It is possible to define a default stack:
+```
+vde_default_stack(stack);
+```
+The default stack will be used by any successive socket(2) call. (It is implemented by a shared library
+		interposition of the *socket* interface function).
+
+So after a user defines:
+```
+vde_default_stack(mystack);
+```
+The call:
+```
+fd = socket(AF_INET, SOCK_STREAM, 0);
+```
+is equivalent to:
+```
+fd = vde_msocket(mystack, AF_INET, SOCK_STREAM, 0);
+```
+
+Use
+```
+vde_default_stack(NULL);
+```
+to undefine the current default stack.
+
 ## Address/Route definition
 
 Vdestack's virtual interfaces must be configured. IP address, netmask, routing must be properly set.
