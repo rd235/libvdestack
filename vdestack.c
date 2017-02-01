@@ -340,7 +340,7 @@ struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 			goto err_cmdpipe;
 		stack->cmdpid = -1;
 		stack->sfd = -1;
-		strncpy(stack->ifname, ifnameok, ifnameoklen);
+		strncpy(stack->ifname, ifnameok, ifnameoklen + 1);
 
 		if (vdenet == NULL || vdenet[0] == 0)
 			stack->conntype = CONNTYPE_NONE;
