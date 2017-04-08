@@ -235,7 +235,7 @@ static void notap(struct vdestack *stack, sigset_t *chldmask) {
 
 static void plug2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
 	int n;
-	char buf[4096];
+	char buf[VDE_ETHBUFSIZE];
 	VDECONN *conn = stack->conn.vdeconn; 
 	struct pollfd pfd[] = {COMMON_POLLFD(stack),
 		{tapfd, POLLIN, 0}, 
@@ -245,12 +245,12 @@ static void plug2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
 		if (common_poll(pfd, stack))
 			break;
 		if (pfd[2].revents & POLLIN) {
-			n = read(tapfd, buf, 4096);
+			n = read(tapfd, buf, VDE_ETHBUFSIZE);
 			if (n == 0) break;
 			vde_send(conn, buf, n, 0);
 		}
 		if (pfd[3].revents & POLLIN) {
-			n = vde_recv(conn, buf, 4096, 0);
+			n = vde_recv(conn, buf, VDE_ETHBUFSIZE, 0);
 			if (n == 0) break;
 			write(tapfd, buf, n);
 		}
@@ -264,7 +264,7 @@ static ssize_t stream2tap_read(void *opaque, void *buf, size_t count) {
 
 static void stream2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
 	int n;
-	unsigned char buf[4096];
+	unsigned char buf[VDE_ETHBUFSIZE];
 	int *streamfd = stack->conn.streamfd;
 	struct pollfd pfd[] = {COMMON_POLLFD(stack),
 		{tapfd, POLLIN, 0}, 
@@ -275,12 +275,12 @@ static void stream2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
 		if (common_poll(pfd, stack))
 			break;
 		if (pfd[2].revents & POLLIN) {
-			n = read(tapfd, buf, 4096);
+			n = read(tapfd, buf, VDE_ETHBUFSIZE);
 			if (n == 0) break;
 			vdestream_send(vdestream, buf, n);
 		}
 		if (pfd[3].revents & POLLIN) {
-			n = read(streamfd[0], buf, 4096);
+			n = read(streamfd[0], buf, VDE_ETHBUFSIZE);
 			if (n == 0) break;
 			vdestream_recv(vdestream, buf, n);
 		}
