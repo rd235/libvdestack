@@ -62,7 +62,7 @@
 
 #define DEFAULT_IF_NAME "vde0"
 
-#define errExit(msg)    ({ perror(msg); exit(EXIT_FAILURE); })
+#define errExit(msg)    ({ perror(msg); _exit(EXIT_FAILURE); })
 
 #define CHILD_STACK_SIZE (256 * 1024)
 
@@ -187,7 +187,7 @@ static int runcmd (struct vdestack *stack) {
 					prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
 					grant_net_capabilities();
 					execv(cmd.argv[0],cmd.argv);
-					exit(2);
+					_exit(2);
 				}
 			}
 		}
@@ -288,11 +288,19 @@ static void stream2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
 	vdestream_close(vdestream);
 }
 
+static void resetHandlers(void) {
+	int sig;
+	for (sig = 0; sig < _NSIG; sig++)
+		signal(sig, SIG_DFL);
+}
+
 static int childFunc(void *arg)
 {
 	struct vdestack *stack = arg;
 	int tapfd;
 	sigset_t chldmask;
+
+	resetHandlers();
 
 	sigemptyset(&chldmask);
 	sigaddset(&chldmask, SIGCHLD);
@@ -322,7 +330,7 @@ static int childFunc(void *arg)
 	}
 	close(stack->sfd);
 	close(stack->cmdpipe[DAEMONSIDE]);
-	exit(EXIT_SUCCESS);
+	_exit(EXIT_SUCCESS);
 }
 
 /********************************* APP CODE *******************************/
