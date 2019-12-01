@@ -5,10 +5,11 @@ Internet of Threads through Network Namespaces.
 
 ## Install libvdestack
 
-libvdestack uses the auto-tools, so the standard procedure to compile and install the library is:
+libvdestack uses the cmake, so the standard procedure to compile and install the library is:
 ```
-$ autoreconf -if
-$ ./configure
+$ mkdir build
+$ cd build
+$ cmake ..
 $ make
 $ sudo make install
 ```
