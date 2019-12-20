@@ -37,9 +37,6 @@ set_target_properties(vdestack PROPERTIES VERSION ${PROJECT_VERSION}
 
 install(TARGETS vdestack DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-#file(GLOB MAN3_PAGES ${CMAKE_CURRENT_SOURCE_DIR}/*.3)
-#
-#install(FILES ${MAN3_PAGES} DESTINATION ${CMAKE_INSTALL_MANDIR}/man3)
 add_subdirectory(man)
 
 add_custom_target(uninstall
