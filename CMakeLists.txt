@@ -36,6 +36,7 @@ set_target_properties(vdestack PROPERTIES VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR})
 
 install(TARGETS vdestack DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES vdestack.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 add_subdirectory(man)
 
