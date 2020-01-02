@@ -7,10 +7,12 @@ project("libvdestack"
 
 include(GNUInstallDirs)
 include(CheckIncludeFile)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FORTIFY_SOURCE=2 -O2 -pedantic -Wall -Wextra")
 
 set(CMAKE_REQUIRED_QUIET TRUE)
 set(LIBS_REQUIRED vdeplug cap execs)
 set(HEADERS_REQUIRED libvdeplug.h sys/capability.h execs.h)
+set(PROJECT_PC_REQUIRES "vdeplug cap execs")
 
 foreach(THISLIB IN LISTS LIBS_REQUIRED)
   find_library(LIB${THISLIB}_OK ${THISLIB})
@@ -35,8 +37,12 @@ target_link_libraries(vdestack -lcap -lexecs -lvdeplug)
 set_target_properties(vdestack PROPERTIES VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR})
 
+configure_file(vdestack.pc.in vdestack.pc @ONLY)
+
 install(TARGETS vdestack DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES vdestack.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/vdestack.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 add_subdirectory(man)
 
