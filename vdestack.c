@@ -61,7 +61,7 @@
 
 #define DEFAULT_IF_NAME "vde0"
 
-#define errExit(msg)    ({ perror(msg); _exit(EXIT_FAILURE); })
+#define errExit(msg)    do { perror(msg); _exit(EXIT_FAILURE); } while(0)
 
 #define CHILD_STACK_SIZE (256 * 1024)
 
@@ -76,7 +76,7 @@ struct vdestack {
 		int streamfd[2];
 	} conn;
 	char *child_stack;
-	char ifname[0];
+	char ifname[];
 };
 
 struct vdecmd {
@@ -96,7 +96,10 @@ static struct vdestack *default_stack;
 static int real_socket(int domain, int type, int protocol) {
 	static int (*socket_next) ();
 	if (socket_next == NULL)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 		socket_next = dlsym(RTLD_NEXT, "socket");
+#pragma GCC diagnostic pop
 	return socket_next(domain, type, protocol);
 }
 
@@ -180,7 +183,8 @@ static int runcmd (struct vdestack *stack) {
 				struct vdereply reply;
 				reply.rval = real_socket(cmd.domain, cmd.type, cmd.protocol);
 				reply.err = errno;
-				write(stack->cmdpipe[DAEMONSIDE], &reply, sizeof(reply));
+				if (write(stack->cmdpipe[DAEMONSIDE], &reply, sizeof(reply)) < 0)
+					return -1;
 			} else {
 				if ((stack->cmdpid = fork()) == 0) {
 					prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
@@ -203,11 +207,12 @@ static int waitcmd(struct vdestack *stack) {
 		else {
 			int status;
 			waitpid(fdsi.ssi_pid, &status, 0);
-			if (fdsi.ssi_pid == stack->cmdpid) {
+			if (((pid_t) fdsi.ssi_pid) == stack->cmdpid) {
 				struct vdereply reply;
 				reply.rval = WEXITSTATUS(status);
 				reply.err = 0;
-				write(stack->cmdpipe[DAEMONSIDE], &reply, sizeof(reply));
+				if (write(stack->cmdpipe[DAEMONSIDE], &reply, sizeof(reply)) < 0)
+					return 1;
 			}
 		}
 	}
@@ -225,14 +230,14 @@ static inline int common_poll (struct pollfd *pfd, struct vdestack *stack) {
 	return 0;
 }
 
-static void notap(struct vdestack *stack, sigset_t *chldmask) {
+static void notap(struct vdestack *stack) {
 	struct pollfd pfd[] = {COMMON_POLLFD(stack)};
 	while (poll(pfd, 1, -1) >= 0)
 		if (common_poll(pfd, stack))
 			break;
 }
 
-static void plug2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
+static void plug2tap(struct vdestack *stack, int tapfd) {
 	int n;
 	char buf[VDE_ETHBUFSIZE];
 	VDECONN *conn = stack->conn.vdeconn; 
@@ -251,7 +256,12 @@ static void plug2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
 		if (pfd[3].revents & POLLIN) {
 			n = vde_recv(conn, buf, VDE_ETHBUFSIZE, 0);
 			if (n == 0) break;
-			write(tapfd, buf, n);
+			if ((write(tapfd, buf, n)) < 0) {
+				if (errno = EIO)
+					continue;
+				else
+					break;
+			}
 		}
 	}
 }
@@ -261,7 +271,7 @@ static ssize_t stream2tap_read(void *opaque, void *buf, size_t count) {
 	return write(*tapfd, buf, count);
 }
 
-static void stream2tap(struct vdestack *stack, int tapfd, sigset_t *chldmask) {
+static void stream2tap(struct vdestack *stack, int tapfd) {
 	int n;
 	unsigned char buf[VDE_ETHBUFSIZE];
 	int *streamfd = stack->conn.streamfd;
@@ -312,17 +322,17 @@ static int childFunc(void *arg)
 
 	switch (stack->conntype) {
 		case CONNTYPE_NONE:
-			notap(stack, &chldmask);
+			notap(stack);
 			break;
 		case CONNTYPE_VDE:
 			if ((tapfd = open_tap(stack->ifname)) < 0)
 				errExit("tap");
-			plug2tap(stack, tapfd, &chldmask);
+			plug2tap(stack, tapfd);
 			break;
 		case CONNTYPE_VDESTREAM:
 			if ((tapfd = open_tap(stack->ifname)) < 0)
 				errExit("tap");
-			stream2tap(stack, tapfd, &chldmask);
+			stream2tap(stack, tapfd);
 			break;
 		default:
 			errExit("unknown conn type");
@@ -399,8 +409,9 @@ int vde_stack_onecmd(char **argv, void *opaquestack) {
 	struct vdecmd cmd = {argv, 0, 0, 0};
 	struct vdereply reply;
 
-	write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd));
-	read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply));
+	if (write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd)) < 0 ||
+			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
+		reply.rval = -1;
 
 	return reply.rval;
 }
@@ -414,11 +425,11 @@ int vde_msocket(struct vdestack *stack, int domain, int type, int protocol) {
 	struct vdecmd cmd = {NULL, domain, type, protocol};
 	struct vdereply reply;
 
-	write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd));
-	read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply));
+	if (write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd)) < 0 ||
+			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
+		reply.rval = -1;
 
 	if (reply.rval < 0) 
 		errno = reply.err;
 	return reply.rval;
 }
-
