@@ -41,6 +41,11 @@
 #include <dlfcn.h>
 #include <vdestack.h>
 
+/* workaround for legacy vde2 libvdeplug.h compatibility */
+#ifndef VDE_ETHBUFSIZE
+#define VDE_ETHBUFSIZE (9216 + 14 + 4)
+#endif
+
 /* just in case prctl.h is not providing these definitions */
 #ifndef PR_CAP_AMBIENT
 #define PR_CAP_AMBIENT      47
