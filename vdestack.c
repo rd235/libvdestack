@@ -416,8 +416,10 @@ int vde_stack_onecmd(char **argv, void *opaquestack) {
 
 	if (write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd)) < 0 ||
 			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
-		reply.rval = -1;
+		return -1;
 
+	if (reply.rval < 0) 
+		errno = reply.err;
 	return reply.rval;
 }
 
@@ -432,7 +434,7 @@ int vde_msocket(struct vdestack *stack, int domain, int type, int protocol) {
 
 	if (write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd)) < 0 ||
 			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
-		reply.rval = -1;
+		return -1;
 
 	if (reply.rval < 0) 
 		errno = reply.err;
