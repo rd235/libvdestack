@@ -65,6 +65,7 @@
 #define CONNTYPE_VDESTREAM 2
 
 #define DEFAULT_IF_NAME "vde0"
+#define POLLING_TIMEOUT 10000
 
 #define errExit(msg)    do { perror(msg); _exit(EXIT_FAILURE); } while(0)
 
@@ -75,6 +76,7 @@ struct vdestack {
 	int cmdpipe[2]; // socketpair for commands;
 	pid_t cmdpid;
 	int sfd;
+	pid_t parentpid;
 	int conntype;
 	union {
 		VDECONN *vdeconn;
@@ -221,6 +223,8 @@ static int waitcmd(struct vdestack *stack) {
 
 #define COMMON_POLLFD(s) {(s)->cmdpipe[DAEMONSIDE], POLLIN, 0}, {(s)->sfd, POLLIN, 0}
 static inline int common_poll (struct pollfd *pfd, struct vdestack *stack) {
+	if (kill(stack->parentpid, 0) < 0)
+		return 1;
 	if (pfd[0].revents & POLLIN) {
 		if (runcmd(stack) <= 0)
 			return 1;
@@ -232,7 +236,7 @@ static inline int common_poll (struct pollfd *pfd, struct vdestack *stack) {
 
 static void notap(struct vdestack *stack) {
 	struct pollfd pfd[] = {COMMON_POLLFD(stack)};
-	while (poll(pfd, 1, -1) >= 0)
+	while (poll(pfd, 1, POLLING_TIMEOUT) >= 0)
 		if (common_poll(pfd, stack))
 			break;
 }
@@ -245,7 +249,7 @@ static void plug2tap(struct vdestack *stack, int tapfd) {
 		{tapfd, POLLIN, 0}, 
 		{vde_datafd(conn), POLLIN, 0}
 	};
-	while (poll(pfd, sizeof(pfd)/sizeof(pfd[0]), -1) >= 0) {
+	while (poll(pfd, sizeof(pfd)/sizeof(pfd[0]), POLLING_TIMEOUT) >= 0) {
 		if (common_poll(pfd, stack))
 			break;
 		if (pfd[2].revents & POLLIN) {
@@ -280,7 +284,7 @@ static void stream2tap(struct vdestack *stack, int tapfd) {
 		{streamfd[0], POLLIN, 0}
 	};
 	VDESTREAM *vdestream = vdestream_open(&tapfd, streamfd[1], stream2tap_read, NULL);
-	while (poll(pfd, sizeof(pfd)/sizeof(pfd[0]), -1) >= 0) {
+	while (poll(pfd, sizeof(pfd)/sizeof(pfd[0]), POLLING_TIMEOUT) >= 0) {
 		if (common_poll(pfd, stack))
 			break;
 		if (pfd[2].revents & POLLIN) {
@@ -316,7 +320,7 @@ static int childFunc(void *arg)
 	sigprocmask(SIG_BLOCK, &chldmask, NULL);
 	stack->sfd = signalfd(-1, &chldmask, SFD_CLOEXEC);
 
-	/* printf("starting stack tid %d\n", stack->pid); */
+	/* printf("starting stack tid %d %d\n", stack->pid, stack->parentpid); */
 
 	switch (stack->conntype) {
 		case CONNTYPE_NONE:
@@ -355,6 +359,7 @@ struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 			goto err_cmdpipe;
 		stack->cmdpid = -1;
 		stack->sfd = -1;
+		stack->parentpid = getpid();
 		strncpy(stack->ifname, ifnameok, ifnameoklen + 1);
 
 		if (vdenet == NULL || vdenet[0] == 0)
