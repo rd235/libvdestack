@@ -1,6 +1,6 @@
 /*
  * vdestack: run a network namespace as a library (and connect it to a vde network).
- * Copyright (C) 2016 Renzo Davoli, Davide Berardi. University of Bologna. <renzo@cs.unibo.it>
+ * Copyright (C) 2016-2020 Renzo Davoli, Davide Berardi. University of Bologna. <renzo@cs.unibo.it>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -32,6 +32,7 @@
 #include <sys/prctl.h>
 #include <sys/ioctl.h>
 #include <sys/signalfd.h>
+#include <sys/mman.h>
 #include <net/if.h>
 #include <linux/if_tun.h>
 #include <libvdeplug.h>
@@ -229,7 +230,7 @@ static inline int common_poll (struct pollfd *pfd, struct vdestack *stack) {
 		if (runcmd(stack) <= 0)
 			return 1;
 	}
-	if (pfd[1].revents & POLLIN) 
+	if (pfd[1].revents & POLLIN)
 		return waitcmd(stack);
 	return 0;
 }
@@ -244,9 +245,9 @@ static void notap(struct vdestack *stack) {
 static void plug2tap(struct vdestack *stack, int tapfd) {
 	int n;
 	char buf[VDE_ETHBUFSIZE];
-	VDECONN *conn = stack->conn.vdeconn; 
+	VDECONN *conn = stack->conn.vdeconn;
 	struct pollfd pfd[] = {COMMON_POLLFD(stack),
-		{tapfd, POLLIN, 0}, 
+		{tapfd, POLLIN, 0},
 		{vde_datafd(conn), POLLIN, 0}
 	};
 	while (poll(pfd, sizeof(pfd)/sizeof(pfd[0]), POLLING_TIMEOUT) >= 0) {
@@ -280,7 +281,7 @@ static void stream2tap(struct vdestack *stack, int tapfd) {
 	unsigned char buf[VDE_ETHBUFSIZE];
 	int *streamfd = stack->conn.streamfd;
 	struct pollfd pfd[] = {COMMON_POLLFD(stack),
-		{tapfd, POLLIN, 0}, 
+		{tapfd, POLLIN, 0},
 		{streamfd[0], POLLIN, 0}
 	};
 	VDESTREAM *vdestream = vdestream_open(&tapfd, streamfd[1], stream2tap_read, NULL);
@@ -351,7 +352,8 @@ struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 	struct vdestack *stack = malloc(sizeof(*stack) + ifnameoklen + 1);
 
 	if (stack) {
-		stack->child_stack = malloc(CHILD_STACK_SIZE);
+		stack->child_stack =
+			mmap(0, CHILD_STACK_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 		if (stack->child_stack == NULL)
 			goto err_child_stack;
 
@@ -388,7 +390,7 @@ err_vdenet:
 	close(stack->cmdpipe[APPSIDE]);
 	close(stack->cmdpipe[DAEMONSIDE]);
 err_cmdpipe:
-	free(stack->child_stack);
+	munmap(stack->child_stack, CHILD_STACK_SIZE);
 err_child_stack:
 	free(stack);
 	return NULL;
@@ -403,7 +405,7 @@ void vde_delstack(struct vdestack *stack) {
 		default_stack = NULL;
 	close(stack->cmdpipe[APPSIDE]);
 	waitpid(stack->pid, NULL, 0);
-	free(stack->child_stack);
+	munmap(stack->child_stack, CHILD_STACK_SIZE);
 	free(stack);
 }
 
@@ -416,7 +418,7 @@ int vde_stack_onecmd(char **argv, void *opaquestack) {
 			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
 		return -1;
 
-	if (reply.rval < 0) 
+	if (reply.rval < 0)
 		errno = reply.err;
 	return reply.rval;
 }
@@ -434,7 +436,7 @@ int vde_msocket(struct vdestack *stack, int domain, int type, int protocol) {
 			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
 		return -1;
 
-	if (reply.rval < 0) 
+	if (reply.rval < 0)
 		errno = reply.err;
 	return reply.rval;
 }
