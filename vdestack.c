@@ -96,7 +96,6 @@ struct vdereply {
 	int err;
 };
 
-
 static struct vdestack *default_stack;
 static int real_socket(int domain, int type, int protocol) {
 	static int (*socket_next) ();
@@ -207,18 +206,14 @@ static int runcmd (struct vdestack *stack) {
 static int waitcmd(struct vdestack *stack) {
 	struct signalfd_siginfo fdsi;
 	if (read(stack->sfd, &fdsi, sizeof(struct signalfd_siginfo)) == sizeof(fdsi)) {
-		if (fdsi.ssi_signo == SIGHUP)
-			return 1;
-		else {
-			int status;
-			waitpid(fdsi.ssi_pid, &status, 0);
-			if (((pid_t) fdsi.ssi_pid) == stack->cmdpid) {
-				struct vdereply reply;
-				reply.rval = WEXITSTATUS(status);
-				reply.err = 0;
-				if (write(stack->cmdpipe[DAEMONSIDE], &reply, sizeof(reply)) < 0)
-					return 1;
-			}
+		int status;
+		waitpid(fdsi.ssi_pid, &status, 0);
+		if (((pid_t) fdsi.ssi_pid) == stack->cmdpid) {
+			struct vdereply reply;
+			reply.rval = WEXITSTATUS(status);
+			reply.err = 0;
+			if (write(stack->cmdpipe[DAEMONSIDE], &reply, sizeof(reply)) < 0)
+				return 1;
 		}
 	}
 	return 0;
@@ -318,10 +313,8 @@ static int childFunc(void *arg)
 
 	sigemptyset(&chldmask);
 	sigaddset(&chldmask, SIGCHLD);
-	sigaddset(&chldmask, SIGHUP);
 	sigprocmask(SIG_BLOCK, &chldmask, NULL);
 	stack->sfd = signalfd(-1, &chldmask, SFD_CLOEXEC);
-	prctl(PR_SET_PDEATHSIG, SIGHUP, 0, 0, 0);
 
 	/* printf("starting stack tid %d\n", stack->pid); */
 
