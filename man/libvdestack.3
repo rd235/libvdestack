@@ -20,9 +20,9 @@
 .\" Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
 .\" MA 02110-1301 USA.
 .\"
-.\" generated with Ronn-NG/v0.8.0
-.\" http://github.com/apjanke/ronn-ng/tree/0.8.0
-.TH "LIBVDESTACK" "3" "December 2019" "VirtualSquare"
+.\" generated with Ronn-NG/v0.9.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.9.1
+.TH "LIBVDESTACK" "3" "June 2021" "VirtualSquare"
 .SH "NAME"
 vde_addstack, vde_delstack, vde_stackcmd, vde_msocket \- vde network namespace as a user library
 .SH "SYNOPSIS"
@@ -44,7 +44,7 @@ Libvdestack implements the idea of Internet of Threads through network namespace
 .P
 \fBvde_delstack\fR destroys a vdestack when it is no longer needed\.
 .P
-\fBvde_stackcmd\fR run a command or a comma separated sequence of commands in the private network namespace\. The purpose of this function is to configure the networking parameters and options (e\.g\. IP address, routing)\. For security reasons, commands must be specified using full pathnames\.
+\fBvde_stackcmd\fR run a command or a comma separated sequence of commands in the private network namespace\. The purpose of this function is to configure the networking parameters and options (e\.g\. IP address, routing)\. For security reasons, commands must be specified using full pathnames\. Do not use this function to start long lasting or non terminating programs, the caller waits for the termination of the command sequence\.
 .P
 \fBvde_msocket\fR has the same semantics of \fBsocket\fR(2) except that the socket is defined in the scope of the network namespace whose descriptor is the first argument\. The remaining arguments are those defined in socket(2)\.
 .P
@@ -84,6 +84,6 @@ vde_delstack(stack);
 .SH "SEE ALSO"
 \fBsocket\fR(2), \fBvde_plug\fR(1)
 .SH "BUGS"
-Bug reports should be addressed to \fI\%mailto:info@virtualsquare\.org\fR
+Bug reports should be addressed to \fIinfo@virtualsquare\.org\fR
 .SH "AUTHOR"
 VirtualSquare\. Project leader: Renzo Davoli\.

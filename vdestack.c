@@ -28,6 +28,7 @@
 #include <sched.h>
 #include <limits.h>
 #include <errno.h>
+#include <pthread.h>
 #include <sys/capability.h>
 #include <sys/prctl.h>
 #include <sys/ioctl.h>
@@ -74,6 +75,7 @@
 
 struct vdestack {
 	pid_t pid;
+	pthread_mutex_t mutex;
 	int cmdpipe[2]; // socketpair for commands;
 	pid_t cmdpid;
 	int sfd;
@@ -352,6 +354,9 @@ struct vdestack *vde_addstack(char *vdenet, char *ifname) {
 	struct vdestack *stack = malloc(sizeof(*stack) + ifnameoklen + 1);
 
 	if (stack) {
+		if (pthread_mutex_init(&stack->mutex, NULL) != 0)
+			goto err_mutex;
+
 		stack->child_stack =
 			mmap(0, CHILD_STACK_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 		if (stack->child_stack == NULL)
@@ -392,6 +397,8 @@ err_vdenet:
 err_cmdpipe:
 	munmap(stack->child_stack, CHILD_STACK_SIZE);
 err_child_stack:
+	pthread_mutex_destroy(&stack->mutex);
+err_mutex:
 	free(stack);
 	return NULL;
 }
@@ -406,6 +413,7 @@ void vde_delstack(struct vdestack *stack) {
 	close(stack->cmdpipe[APPSIDE]);
 	waitpid(stack->pid, NULL, 0);
 	munmap(stack->child_stack, CHILD_STACK_SIZE);
+	pthread_mutex_destroy(&stack->mutex);
 	free(stack);
 }
 
@@ -414,13 +422,18 @@ int vde_stack_onecmd(char **argv, void *opaquestack) {
 	struct vdecmd cmd = {argv, 0, 0, 0};
 	struct vdereply reply;
 
+	pthread_mutex_lock(&stack->mutex);
 	if (write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd)) < 0 ||
 			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
-		return -1;
+		goto errmsg;
 
+	pthread_mutex_unlock(&stack->mutex);
 	if (reply.rval < 0)
 		errno = reply.err;
 	return reply.rval;
+errmsg:
+	pthread_mutex_unlock(&stack->mutex);
+	return -1;
 }
 
 /* parse the args, allowing multiple comma separated commands on a single line */
@@ -432,11 +445,16 @@ int vde_msocket(struct vdestack *stack, int domain, int type, int protocol) {
 	struct vdecmd cmd = {NULL, domain, type, protocol};
 	struct vdereply reply;
 
+	pthread_mutex_lock(&stack->mutex);
 	if (write(stack->cmdpipe[APPSIDE],  &cmd, sizeof(cmd)) < 0 ||
 			read(stack->cmdpipe[APPSIDE], &reply, sizeof(reply)) < 0)
-		return -1;
+		goto errmsg;
 
+	pthread_mutex_unlock(&stack->mutex);
 	if (reply.rval < 0)
 		errno = reply.err;
 	return reply.rval;
+errmsg:
+	pthread_mutex_unlock(&stack->mutex);
+	return -1;
 }

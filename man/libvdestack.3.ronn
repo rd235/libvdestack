@@ -57,7 +57,8 @@ name is vde0.
 
 `vde_stackcmd`  run  a  command or a comma separated sequence of commands in the private network namespace.  The purpose of
 this function is to configure the networking parameters and options (e.g. IP address, routing).   For  security  reasons,
-commands must be specified using full pathnames.
+commands must be specified using full pathnames. Do not use this function to start long lasting or non terminating programs,
+the caller waits for the termination of the command sequence.
 
 `vde_msocket`  has  the same semantics of `socket`(2) except that the socket is defined in the scope of the network namespace
 whose descriptor is the first argument. The remaining arguments are those defined in socket(2).
