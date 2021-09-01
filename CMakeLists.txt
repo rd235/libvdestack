@@ -32,7 +32,7 @@ add_definitions(-D_GNU_SOURCE)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(vdestack SHARED vdestack.c)
-target_link_libraries(vdestack -lcap -lexecs -lvdeplug -lpthread)
+target_link_libraries(vdestack cap execs vdeplug pthread)
 
 set_target_properties(vdestack PROPERTIES VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR})
