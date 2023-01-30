@@ -438,7 +438,11 @@ errmsg:
 
 /* parse the args, allowing multiple comma separated commands on a single line */
 int vde_stackcmd(struct vdestack *stack, char *stackcmd) {
+#if defined(EXECS_SOVERSION) && EXECS_SOVERSION > 0
+	return s2multiargv(stackcmd, vde_stack_onecmd, stack, 0);
+#else
 	return s2multiargv(stackcmd, vde_stack_onecmd, stack);
+#endif
 }
 
 int vde_msocket(struct vdestack *stack, int domain, int type, int protocol) {
