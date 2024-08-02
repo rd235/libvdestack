@@ -29,7 +29,7 @@ vde_addstack, vde_delstack, vde_stackcmd, vde_msocket - vde network namespace as
 
 # SYNOPSIS
 
-`#include *vdestack.h*`
+`#include <vdestack.h>`
 
 `struct vdestack *vde_addstack(char *`_vdenet_`, char *`_ifname_`);`
 
