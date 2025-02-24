@@ -103,7 +103,7 @@ struct vdereply {
 
 static struct vdestack *default_stack;
 static int real_socket(int domain, int type, int protocol) {
-	static int (*socket_next) ();
+	static int (*socket_next) (int domain, int type, int protocol);
 	if (socket_next == NULL)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"

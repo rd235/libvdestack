@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.13)
 project("vdestack"
     DESCRIPTION "A network namespace as a library, i.e. Internet of Threads through Network Namespaces."
     HOMEPAGE_URL "https://github.com/rd235/libvdestack"
-    VERSION 0.1.3
+    VERSION 0.1.4
     LANGUAGES C)
 
 include(GNUInstallDirs)
